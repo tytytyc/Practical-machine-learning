@@ -1,0 +1,132 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "TYC"
+date: "2/8/2022"
+output:
+  html_document: default
+  word_document: default
+---
+
+# Overview
+The goal of this project is to predict the manner in which people did the exercise ("classe" variable in the training set).
+
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+### Read data and data cleaning
+```{r}
+# read library and set seed
+pacman::p_load(caret,rattle,randomForest,parallel,doParallel)
+set.seed(123)
+#cluster=makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+#registerDoParallel(cluster)
+
+# read training and testing set
+train=read.csv("pml-training.csv",na.strings=c("NA","#DIV/0!", ""))
+test=read.csv("pml-testing.csv",na.strings=c("NA","#DIV/0!", ""))
+
+# remove irrelevant columns and columns with missing values
+train=subset(train, select=-c(1:7)) # remove row numbers, time stamp and user names
+train1=train[,colSums(is.na(train))==0] # remove columns with NA value
+
+test=subset(test, select=-c(1:7)) # remove row numbers, time stamp and user names
+test1=test[,colSums(is.na(test)) == 0] # remove columns with NA value
+```
+
+### Data slicing
+Split the training set into training set (60%) and validation set (40%).
+```{r}
+intrain=createDataPartition(train1$classe, p=0.60, list=F)
+training=train1[intrain, ]
+testing=train1[-intrain, ]
+```
+
+### Cross validation 
+```{r}
+# create 3 folds for cross validation
+train_control=trainControl(method="cv", number=3, allowParallel = F)  #, allowParallel=T
+```
+
+### Data modeling
+Constructing Decision Tress
+```{r}
+# decision trees
+m1=train(classe ~., data=training, method="rpart", trControl=train_control)
+
+rattle::fancyRpartPlot(m1$finalModel)
+
+# prediction
+p1=predict(m1, testing)
+r1=confusionMatrix(p1, factor(testing$classe))
+r1
+
+# accuracy and out of sample error
+acc1=round(r1$overall["Accuracy"],3)
+oos1=round(1-acc1,3)
+```
+The accuracy of the decision tree is **`r acc1*100`** % and the out-of-sample error is **`r oos1*100`**.
+
+
+Using Linear Discriminant Analysis (LDA) to fit a model
+```{r}
+# LDA
+m2=train(classe ~., data=training, method="lda", trControl=train_control)
+
+# prediction
+p2=predict(m2, testing)
+r2=confusionMatrix(p2, factor(testing$classe))
+r2
+
+# accuracy and out of sample error
+acc2=round(r2$overall["Accuracy"],3)
+oos2=round(1-acc2,3)
+```
+The accuracy of the LDA model is **`r acc2*100`** % and the out-of-sample error is **`r oos2*100`**.
+
+
+Using Gradient Boosting Machine to fit a model
+```{r}
+# GBM
+m3=train(classe ~., data=training, method="gbm", trControl=train_control, verbose = F)
+
+# prediction
+p3=predict(m3, testing)
+r3=confusionMatrix(p3, factor(testing$classe))
+r3
+
+# accuracy and out of sample error
+acc3=round(r3$overall["Accuracy"],3)
+oos3=round(1-acc3,3)
+```
+The accuracy of the GBM model is **`r acc3*100`** % and the out-of-sample error is **`r oos3*100`**.
+
+
+Using Random Forest to fit a model
+```{r}
+# RF
+m4=train(classe ~., data=training, method="rf", trControl=train_control)
+
+# prediction
+p4=predict(m4, testing)
+r4=confusionMatrix(p4, factor(testing$classe))
+r4
+
+# accuracy and out of sample error
+acc4=round(r4$overall["Accuracy"],3)
+oos4=round(1-acc4,3)
+
+#stopCluster(cluster)
+```
+The accuracy of the Random Forest model is **`r acc4*100`** % and the out-of-sample error is **`r oos4*100`**.
+
+###Predictions on Test Set
+Since **Random Forest** model has the highest accuracy, apply the LDA model to the test data.
+```{r}
+predict(m4, test1)
+```
+
+
+
+
+
+
